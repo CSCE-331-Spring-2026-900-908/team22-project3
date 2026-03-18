@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/CSCE-331-Spring-2026-900-908/team22-project3#readme",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.20.0"
   }
 }
