@@ -1,0 +1,40 @@
+#SCRUM Meeting 1
+
+SCRUM Meeting 1 for ProjectName
+Prepared by: Alan Davila
+Meeting Date: 03/25/2025
+
+Meeting Attendees:
+Bao Nguyen
+Ethan Vu
+Akhilesh Vattumilli
+Alan Davila
+Luis Galvan
+
+Meeting Agenda Items:
+Task Assignments 
+Sprint Scheduling
+Product Scheduling
+
+Accomplishments:
+1. Product & Sprint 1 backlog created
+2. Learned how to work the system on render
+3. Frontend and backend are hosted on render
+
+Task Description:
+1. Create portal page that is hosted by render
+2. Created and filled out Sprint and product Backlogs
+
+Assigned to:
+1. Ethan
+2. Bao and Alan
+
+Tasks Completed:
+1. yes
+2. yes
+
+
+Before The Next Meeting
+Plans:
+Create and work on Burndown charts
+Continue to complete needed tasks on sprint and product 1 backlogs
