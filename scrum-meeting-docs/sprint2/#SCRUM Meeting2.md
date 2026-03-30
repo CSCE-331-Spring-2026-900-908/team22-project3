@@ -11,10 +11,9 @@ Akhilesh Vattumilli
 Alan Davila
 Luis Galvan
 
-
 Meeting Agenda Items:
-Re-establishing tasks and answering questions of each job specificities 
-Task Assignments/Ability to work
+1. Re-establishing tasks and answering questions of each job specificities 
+2. Task Assignments/Ability to work
 Status Update Since Last Meeting
 
 Accomplishments:
@@ -34,5 +33,22 @@ Tasks Completed:
 2. Yes
 
 Plans:
-Finish Backlog tasks
-Ensure solid sprint test plan is tested for successful outcome
+1. Finish Backlog tasks
+2. Ensure solid sprint test plan is tested for successful outcome
+
+Task Description:
+1. Backend core,Frontend build system & config, React routing & global styles, Portal landing page.
+2. Menu API route, Order submission route, Customer kiosk component, Customer kiosk styling.
+3. Employee auth route, Menu management route, Cashier POS component, Cashier styling 
+4. Employee & inventory routes, Reports route, Manager panel component, Manager styling
+5. Analytics routes, README, Frontend improvement, Backend improvement
+
+Assigned to:
+1. Ethan
+2. Alan
+3. Bao
+4. Akhilesh
+5. Luis
+
+Minutes from Previous Meeting:
+During this sprint, we assigned each team member specific tasks that must be completed before the upcoming SCRUM meeting. We also outlined the goals we plan to accomplish at the next gathering. As a team, we agreed that learning the programming language and technology stack we are using should be our top priority to ensure smoother development moving forward. Additionally, we decided to focus first on implementing restricted functionality, with the goal of having order creation and tracking features completed by the next SCRUM meeting.
