@@ -15,9 +15,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false          
+        sync: false          # Fill this in on the Render dashboard
       - key: CLIENT_URL
-        sync: false         
+        sync: false          # Fill this in AFTER deploying the frontend (its URL)
 
   # ── Frontend Static Site ─────────────────────────────────────────────
   - type: web
@@ -28,7 +28,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        sync: false          
+        sync: false          # Fill this in AFTER deploying the backend (its URL + /api)
     routes:
       - type: rewrite
         source: /*
