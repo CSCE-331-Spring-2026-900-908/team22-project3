@@ -18,8 +18,7 @@ Luis Galvan
 
 Meeting Agenda Items:
 1. Menu View Completed
-2. Accessibilty
-3. Personalized company brand
+2. Personalized company brand
 
 
 
@@ -40,7 +39,7 @@ Accomplishments:
 
 Task Description:
 1. Menu View Review.
-2. Accessibility implementation (Language, Text Enlargement , Email notification for hearing impaired).
+2. Google Translate API
 3. Add a Logo
 
 
@@ -84,5 +83,4 @@ Assigned to:
 
 
 Minutes from previous meeting:
-During the previous meeting, our team assigned each member specific tasks to complete before the upcoming SCRUM meeting and outlined the goals we hoped to achieve next. Weplanned to focus on restricted functionality first, with the goal of improving the system through order-related features and interface updates. Since that meeting, we successfully completed the new menu view, implemented accessibility improvements such as language support, text enlargement, and notifications for hearing-impaired users, and added a personalized company logo to strengthen the brand identity of the system.
-
+During the previous meeting, our team assigned each member specific tasks to complete before the upcoming SCRUM meeting and outlined the goals we hoped to achieve next. We planned to focus on restricted functionality first, with the goal of improving the system through order-related features and interface updates. After that meeting, we started implementing  the new menu view, implemented accessibility improvements such as language support, text enlargement, and notifications for hearing-impaired users, and added a personalized company logo to strengthen the brand identity of the system.
