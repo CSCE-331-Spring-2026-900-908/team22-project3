@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import dragonLogo from '../assets/dragon-logo.webp'
 import './Portal.css'
 
 const views = [
@@ -51,7 +52,7 @@ export default function Portal() {
 
       <div className="portal__content">
         <div className="portal__header">
-          <span className="portal__logo-icon">🐉</span>
+          <img src={dragonLogo} alt="Dragon Boba logo" className="portal__logo-icon" />
           <h1 className="portal__title">Dragon Boba</h1>
           <p className="portal__tagline">Select your experience</p>
         </div>
