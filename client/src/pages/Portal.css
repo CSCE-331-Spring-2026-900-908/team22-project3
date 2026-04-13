@@ -203,4 +203,5 @@
   background: var(--card-accent);
   transform: translateX(4px);
   border-color: var(--card-accent);
+  
 }
