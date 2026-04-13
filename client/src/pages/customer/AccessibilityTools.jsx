@@ -48,3 +48,16 @@ export default function AccessibilityTools({
           </div>
         )}
       </div>
+      
+{/* Font Size Toggle */}
+      <button
+        className={`kiosk__font-toggle ${fontSize !== 'normal' ? 'kiosk__font-toggle--active' : ''}`}
+        onClick={cycleFontSize}
+        title={`Text size: ${fontSize === 'normal' ? 'Normal' : fontSize === 'large' ? 'Large' : 'Extra Large'}`}
+      >
+        <span className="kiosk__font-toggle-icon">:abc:</span>
+        <span className="kiosk__font-toggle-label">{FONT_SIZE_LABELS[fontSize]}</span>
+      </button>
+    </>
+  );
+}
