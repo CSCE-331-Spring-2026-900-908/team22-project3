@@ -7,7 +7,7 @@ services:
   - type: web
     name: dragon-boba-api
     env: node
-    rootDir: server
+    rootDir: project3-team22-test/server
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
@@ -15,20 +15,26 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false          
+        sync: false          # Fill this in on the Render dashboard
       - key: CLIENT_URL
-        sync: false         
+        sync: false          # Fill this in AFTER deploying the frontend (its URL)
+      - key: GOOGLE_TRANSLATE_API_KEY
+        sync: false          # Your Google Cloud Translation API key
+      - key: GMAIL_USER
+        sync: false          # Gmail address used to send order-ready emails
+      - key: GMAIL_PASS
+        sync: false          # Gmail App Password (not your login password)
 
   # ── Frontend Static Site ─────────────────────────────────────────────
   - type: web
     name: dragon-boba-client
     env: static
-    rootDir: client
+    rootDir: project3-team22-test/client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        sync: false          
+        sync: false          # Fill this in AFTER deploying the backend (its URL + /api)
     routes:
       - type: rewrite
         source: /*
