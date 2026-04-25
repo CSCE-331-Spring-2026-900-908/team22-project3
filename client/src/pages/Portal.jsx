@@ -3,38 +3,30 @@ import './Portal.css'
 
 const views = [
   {
-    title: 'Order Here',
-    subtitle: 'Self-Service Kiosk',
+    title: 'Customer',
     description: 'Browse our menu and place your order',
     path: '/customer',
-    icon: '🧋',
     accent: 'var(--color-gold)',
     gradient: 'linear-gradient(135deg, #D4A847 0%, #F0D78C 100%)',
   },
   {
     title: 'Cashier',
-    subtitle: 'Point of Sale',
     description: 'Employee cashier terminal',
     path: '/cashier',
-    icon: '💳',
     accent: 'var(--color-purple)',
     gradient: 'linear-gradient(135deg, #6B2D6B 0%, #9B59A6 100%)',
   },
   {
     title: 'Manager',
-    subtitle: 'Dashboard',
     description: 'Store management & analytics',
     path: '/manager',
-    icon: '📊',
     accent: 'var(--color-brown)',
     gradient: 'linear-gradient(135deg, #5C3D2E 0%, #8B6914 100%)',
   },
   {
     title: 'Menu Board',
-    subtitle: 'Public TV Display',
     description: 'Auto-scrolling public menu',
     path: '/menuboard',
-    icon: '📺',
     accent: '#2a0845',
     gradient: 'linear-gradient(135deg, #2a0845 0%, #301742 100%)',
   },
@@ -53,7 +45,6 @@ export default function Portal() {
         <div className="portal__header">
           <span className="portal__logo-icon">🐉</span>
           <h1 className="portal__title">Dragon Boba</h1>
-          <p className="portal__tagline">Select your experience</p>
         </div>
 
         <div className="portal__cards">

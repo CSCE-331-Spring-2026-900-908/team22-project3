@@ -58,6 +58,13 @@
   font-size: 2rem;
 }
 
+.kiosk__header-logo {
+  height: 2.5rem;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(212, 168, 71, 0.4));
+}
+
 .kiosk__header-title {
   font-family: var(--font-heading);
   font-size: 1.6rem;

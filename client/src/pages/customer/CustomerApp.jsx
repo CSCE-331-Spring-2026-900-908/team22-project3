@@ -3,6 +3,7 @@ import emailjs from '@emailjs/browser'
 import AccessibilityTools from './AccessibilityTools'
 import SmsNumpadGateway from './SmsNumpadGateway'
 import './Customer.css'
+import dragonLogo from '../../assets/dragon-logo.webp'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
@@ -406,7 +407,7 @@ export default function CustomerApp() {
       {/* Header */}
       <header className="kiosk__header">
         <div className="kiosk__header-brand">
-          <span className="kiosk__header-icon">🐉</span>
+          <img src={dragonLogo} alt="Dragon Boba logo" className="kiosk__header-logo" />
           <h1 className="kiosk__header-title">Dragon Boba</h1>
         </div>
         <div className="kiosk__header-actions">
