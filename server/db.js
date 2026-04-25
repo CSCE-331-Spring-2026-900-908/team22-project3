@@ -1,19 +1,18 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Force Node.js to accept the AWS RDS self-signed certificate in production
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  host: process.env.PSQL_HOST,
+  user: process.env.PSQL_USER,
+  database: process.env.PSQL_DATABASE,
+  password: process.env.PSQL_PASSWORD,
+  port: process.env.PSQL_PORT || 5432,
+  ssl: { rejectUnauthorized: false },
 });
 
 // Test connection on startup
 pool.query('SELECT NOW()')
-  .then(() => console.log('✅ Connected to AWS PostgreSQL database.'))
-  .catch(err => console.error('❌ Database connection failed:', err.message));
+  .then(() => console.log('Connected to AWS PostgreSQL database.'))
+  .catch(err => console.error('Database connection failed:', err.message));
 
 module.exports = pool;
