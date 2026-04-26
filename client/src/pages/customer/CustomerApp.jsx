@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import AccessibilityTools from './AccessibilityTools'
+import WeatherWidget from '../../components/WeatherWidget'
+import ChatbotWidget from '../../components/ChatbotWidget'
+import LoyaltyLogin from './LoyaltyLogin'
+import BobaCasino from './BobaCasino'
+import SmsNumpadGateway from './SmsNumpadGateway'
 import './Customer.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
@@ -21,6 +27,17 @@ function getCategoryIcon(category) {
   return categoryIcons[category] || '🍵'
 }
 
+// Convert item name to image filename slug
+// e.g. "Brown Sugar Milk Tea" → "/drinks/brown-sugar-milk-tea.jpg"
+function getDrinkImage(itemName) {
+  const slug = itemName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')   // remove special chars
+    .trim()
+    .replace(/\s+/g, '-')            // spaces to hyphens
+  return `/drinks/${slug}.png`
+}
+
 // Customization options
 const SUGAR_LEVELS = ['0%', '25%', '50%', '75%', '100%']
 const ICE_LEVELS = ['No Ice', 'Less Ice', 'Regular Ice', 'Extra Ice']
@@ -38,10 +55,79 @@ const ICE_ICONS = {
   'Extra Ice': '❄️❄️❄️',
 }
 
+const FONT_SIZES = ['normal', 'large', 'xlarge']
+const FONT_SIZE_LABELS = { normal: 'A', large: 'A+', xlarge: 'A++' }
+
+// Supported languages
+const LANGUAGES = [
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'es', label: 'Español', flag: '🇪🇸' },
+  { code: 'zh', label: '中文', flag: '🇨🇳' },
+  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'ko', label: '한국어', flag: '🇰🇷' },
+  { code: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'ja', label: '日本語', flag: '🇯🇵' },
+  { code: 'it', label: 'Italiano', flag: '🇮🇹' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+]
+
+// All static UI strings that need translation
+const UI_STRINGS = {
+  moodTitle: 'What are you in the mood for?',
+  backToMenu: 'Back to Menu',
+  backTo: 'Back to',
+  sugarLevel: 'Sugar Level',
+  iceLevel: 'Ice Level',
+  addTopping: 'Add a Topping',
+  addToCart: 'Add to Cart',
+  startingAt: 'Starting at',
+  yourOrder: 'Your Order',
+  cartEmpty: 'Your cart is empty',
+  browseMenu: 'Browse Menu',
+  continueShopping: 'Continue Shopping',
+  subtotal: 'Subtotal',
+  tax: 'Tax (8.25%)',
+  total: 'Total',
+  proceedCheckout: 'Proceed to Checkout',
+  howToPay: 'How would you like to pay?',
+  cash: 'Cash',
+  payAtCounter: 'Pay at counter',
+  credit: 'Credit',
+  creditCard: 'Credit card',
+  debit: 'Debit',
+  debitCard: 'Debit card',
+  placingOrder: 'Placing your order...',
+  orderPlaced: 'Order Placed!',
+  totalCharged: 'Total charged:',
+  thankYou: 'Thank you for your order! 🐉',
+  loadingMenu: 'Loading menu...',
+  backToCart: 'Back to Cart',
+  sugar: 'Sugar',
+  noItems: 'No items available in this category yet.',
+  noIce: 'No Ice',
+  lessIce: 'Less Ice',
+  regularIce: 'Regular Ice',
+  extraIce: 'Extra Ice',
+  none: 'None',
+  boba: 'Boba',
+  lycheeJelly: 'Lychee Jelly',
+  pudding: 'Pudding',
+}
+
 export default function CustomerApp() {
   const [menu, setMenu] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
+
+  // Accessibility state
+  const [fontSize, setFontSize] = useState('normal')
+
+  // Translation state
+  const [lang, setLang] = useState('en')
+  const [translations, setTranslations] = useState({})   // { langCode: { englishText: translatedText } }
+  const [translating, setTranslating] = useState(false)
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false)
+  const langDropdownRef = useRef(null)
 
   // Navigation state
   const [view, setView] = useState('categories') // categories | items | customize | cart | checkout | confirmation
@@ -51,7 +137,10 @@ export default function CustomerApp() {
   // Customization state
   const [sugar, setSugar] = useState('100%')
   const [ice, setIce] = useState('Regular Ice')
-  const [topping, setTopping] = useState('None')
+  const [toppings, setToppings] = useState([])
+
+  // Edit State
+  const [editingItemId, setEditingItemId] = useState(null)
 
   // Cart state
   const [cart, setCart] = useState([])
@@ -59,6 +148,88 @@ export default function CustomerApp() {
   // Checkout state
   const [orderResult, setOrderResult] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Email notification state
+  const [notifyPhone, setNotifyPhone] = useState('')
+  const [notifyCarrier, setNotifyCarrier] = useState('')
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailSending, setEmailSending] = useState(false)
+
+  // Loyalty state
+  const [customer, setCustomer] = useState(null)       // { phone_number, points }
+  const [showLoyaltyLogin, setShowLoyaltyLogin] = useState(true)
+  const [redeemPoints, setRedeemPoints] = useState(false) // toggle at checkout
+  const [pointsToRedeem, setPointsToRedeem] = useState(0)
+
+  const cycleFontSize = useCallback(() => {
+    setFontSize(prev => {
+      const idx = FONT_SIZES.indexOf(prev)
+      return FONT_SIZES[(idx + 1) % FONT_SIZES.length]
+    })
+  }, [])
+
+  // ── Translation Logic ──
+  // Translate a batch of texts via our server proxy
+  const translateTexts = useCallback(async (texts, targetLang) => {
+    if (targetLang === 'en') return null
+    try {
+      const response = await fetch(`${API_BASE}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts, targetLang }),
+      })
+      const data = await response.json()
+      if (data.translations) {
+        const map = {}
+        texts.forEach((text, i) => {
+          map[text] = data.translations[i]
+        })
+        return map
+      }
+    } catch (err) {
+      console.error('Translation error:', err)
+    }
+    return null
+  }, [])
+
+  // When language changes, translate all UI strings + menu items
+  useEffect(() => {
+    if (lang === 'en') return
+    if (translations[lang]) return  // already cached
+
+    const allTexts = [
+      ...Object.values(UI_STRINGS),
+      ...menu.map(item => item.item_name),
+      ...categories,
+    ]
+    // Deduplicate
+    const uniqueTexts = [...new Set(allTexts)]
+
+    setTranslating(true)
+    translateTexts(uniqueTexts, lang).then(map => {
+      if (map) {
+        setTranslations(prev => ({ ...prev, [lang]: map }))
+      }
+      setTranslating(false)
+    })
+  }, [lang, menu, categories, translations, translateTexts])
+
+  // Translation helper — returns translated text or original if no translation
+  const t = useCallback((text) => {
+    if (lang === 'en' || !translations[lang]) return text
+    return translations[lang][text] || text
+  }, [lang, translations])
+
+  // Close language dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target)) {
+        setLangDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Fetch menu on mount
   useEffect(() => {
@@ -78,58 +249,154 @@ export default function CustomerApp() {
   }, [])
 
   // Cart helpers
-  const cartCount = cart.length
-  const cartSubtotal = cart.reduce((sum, item) => sum + item.finalPrice, 0)
+  const cartCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0)
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.finalPrice * (item.quantity || 1)), 0)
   const cartTax = cartSubtotal * 0.0825
   const cartTotal = cartSubtotal + cartTax
 
   const addToCart = useCallback(() => {
-    const toppingObj = TOPPINGS.find(t => t.name === topping)
-    const finalPrice = selectedItem.price + (toppingObj?.price || 0)
-    setCart(prev => [...prev, {
-      id: Date.now() + Math.random(),
-      menuItemId: selectedItem.menu_item_id,
-      name: selectedItem.item_name,
-      basePrice: selectedItem.price,
-      finalPrice,
-      sugarLevel: sugar,
-      iceLevel: ice,
-      topping,
-    }])
-    // Reset and go back to categories
-    setSugar('100%')
-    setIce('Regular Ice')
-    setTopping('None')
-    setView('categories')
-  }, [selectedItem, sugar, ice, topping])
+    let addonsPrice = 0
+    toppings.forEach(t => {
+      const toppingObj = TOPPINGS.find(obj => obj.name === t)
+      if (toppingObj) addonsPrice += toppingObj.price
+    })
+    const finalPrice = selectedItem.price + addonsPrice
+
+    if (editingItemId) {
+      setCart(prev => prev.map(i => i.id === editingItemId ? {
+        ...i,
+        finalPrice,
+        sugarLevel: sugar,
+        iceLevel: ice,
+        toppings,
+      } : i))
+      setEditingItemId(null)
+      // Fix #3: return to cart after editing, not categories
+      setSugar('100%')
+      setIce('Regular Ice')
+      setToppings([])
+      setView('cart')
+    } else {
+      setCart(prev => [...prev, {
+        id: Date.now() + Math.random(),
+        menuItemId: selectedItem.menu_item_id,
+        name: selectedItem.item_name,
+        basePrice: selectedItem.price,
+        finalPrice,
+        sugarLevel: sugar,
+        iceLevel: ice,
+        toppings,
+        quantity: 1,
+      }])
+      setSugar('100%')
+      setIce('Regular Ice')
+      setToppings([])
+      setView('categories')
+    }
+  }, [selectedItem, sugar, ice, toppings, editingItemId])
 
   const removeFromCart = useCallback((itemId) => {
     setCart(prev => prev.filter(i => i.id !== itemId))
   }, [])
 
-  const submitOrder = useCallback(async (paymentMethod) => {
-    setSubmitting(true)
+  const updateCartQuantity = useCallback((itemId, delta) => {
+    setCart(prev => prev.map(i => {
+      if (i.id === itemId) {
+        const newQ = (i.quantity || 1) + delta
+        return { ...i, quantity: Math.max(1, newQ) }
+      }
+      return i
+    }))
+  }, [])
+
+  const editCartItem = useCallback((itemId) => {
+    const itemToEdit = cart.find(i => i.id === itemId)
+    if (!itemToEdit) return
+    const fullMenuObj = menu.find(m => m.menu_item_id === itemToEdit.menuItemId)
+    setSelectedItem(fullMenuObj)
+    setSugar(itemToEdit.sugarLevel)
+    setIce(itemToEdit.iceLevel)
+    setToppings(itemToEdit.toppings || [])
+    setEditingItemId(itemId)
+    setView('customize')
+  }, [cart, menu])
+
+  const sendEmailNotification = useCallback(async () => {
+    if (!notifyPhone || notifyPhone.length !== 10 || !notifyCarrier) return
+    setEmailSending(true)
+    
+    // Convert 10-digit number to carrier email gateway
+    const targetEmail = `${notifyPhone}${notifyCarrier}`
+
     try {
-      const response = await fetch(`${API_BASE}/orders`, {
+      const res = await fetch(`${API_BASE}/email/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: cart.map(item => ({
+          email: targetEmail,
+          orderId: orderResult?.orderId,
+          total: orderResult?.total,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setEmailSent(true)
+      } else {
+        alert('Could not schedule text. Please try again.')
+      }
+    } catch (err) {
+      console.error('Email notify error:', err)
+      alert('Connection error scheduling text message.')
+    } finally {
+      setEmailSending(false)
+    }
+  }, [notifyPhone, notifyCarrier, orderResult])
+
+  const submitOrder = useCallback(async (paymentMethod) => {
+    setSubmitting(true)
+    const pointsUsed = (redeemPoints && customer) ? Math.min(customer.points, pointsToRedeem) : 0
+    try {
+      // Flatten the cart so items with quantity > 1 become separate item objects in the payload
+      // This ensures the backend calculates the total and saves it to the DB correctly.
+      const expandedItems = []
+      cart.forEach(item => {
+        const qty = item.quantity || 1
+        for (let i = 0; i < qty; i++) {
+          expandedItems.push({
             menuItemId: item.menuItemId,
             finalPrice: item.finalPrice,
             basePrice: item.basePrice,
             sugarLevel: item.sugarLevel,
             iceLevel: item.iceLevel,
-            topping: item.topping,
-          })),
+            toppings: item.toppings,
+          })
+        }
+      })
+
+      const response = await fetch(`${API_BASE}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: expandedItems,
           paymentMethod,
-          employeeId: 0, // Self-service kiosk
+          employeeId: 0,
+          customerPhone: customer?.phone_number || null,
+          pointsRedeemed: pointsUsed,
         }),
       })
       const data = await response.json()
       if (data.success) {
         setOrderResult(data)
         setCart([])
+        setNotifyPhone('')
+        setNotifyCarrier('')
+        setEmailSent(false)
+        setRedeemPoints(false)
+        // Update local points balance
+        if (customer) {
+          const earned = Math.floor(parseFloat(data.total)) * 100
+          setCustomer(prev => ({ ...prev, points: Math.max(0, prev.points + earned - pointsUsed) }))
+        }
         setView('confirmation')
       } else {
         alert('Order failed. Please try again.')
@@ -140,15 +407,20 @@ export default function CustomerApp() {
     } finally {
       setSubmitting(false)
     }
-  }, [cart])
+  }, [cart, customer, redeemPoints, pointsToRedeem])  
 
-  // Auto-return from confirmation
+  // Auto-return from confirmation + auto-logout
   useEffect(() => {
     if (view === 'confirmation') {
       const timer = setTimeout(() => {
         setOrderResult(null)
         setView('categories')
-      }, 8000)
+        // Auto-logout: reset customer state so next user starts fresh
+        setCustomer(null)
+        setShowLoyaltyLogin(true)
+        setRedeemPoints(false)
+        setPointsToRedeem(0)
+      }, 25000)
       return () => clearTimeout(timer)
     }
   }, [view])
@@ -158,50 +430,123 @@ export default function CustomerApp() {
 
   // Calculate live price during customization
   const customizePrice = selectedItem
-    ? selectedItem.price + (TOPPINGS.find(t => t.name === topping)?.price || 0)
+    ? selectedItem.price + (toppings.reduce((sum, t) => sum + (TOPPINGS.find(obj => obj.name === t)?.price || 0), 0))
     : 0
+
+  // Current language info
+  const currentLang = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
 
   if (loading) {
     return (
       <div className="kiosk">
         <div className="kiosk__loading">
           <div className="kiosk__loading-spinner" />
-          <p>Loading menu...</p>
+          <p>{t(UI_STRINGS.loadingMenu)}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="kiosk">
+    <div className={`kiosk ${fontSize !== 'normal' ? `kiosk--font-${fontSize}` : ''}`}>
+      {/* Loyalty Login Overlay */}
+      {showLoyaltyLogin && (
+        <LoyaltyLogin
+          onLogin={(customerData) => {
+            setCustomer(customerData)
+            setShowLoyaltyLogin(false)
+          }}
+          onSkip={() => setShowLoyaltyLogin(false)}
+        />
+      )}
+
       {/* Header */}
       <header className="kiosk__header">
-        <div className="kiosk__header-brand">
+        {/* Fix #5: Logo click → home */}
+        <div
+          className="kiosk__header-brand kiosk__header-brand--clickable"
+          onClick={() => setView('categories')}
+          title="Go to main menu"
+        >
           <span className="kiosk__header-icon">🐉</span>
           <h1 className="kiosk__header-title">Dragon Boba</h1>
+          <WeatherWidget />
         </div>
-        {view !== 'confirmation' && (
+        <div className="kiosk__header-actions">
+          {/* Accessibility Tools (Language & Font) */}
+          <AccessibilityTools
+            lang={lang}
+            setLang={setLang}
+            LANGUAGES={LANGUAGES}
+            langDropdownOpen={langDropdownOpen}
+            setLangDropdownOpen={setLangDropdownOpen}
+            langDropdownRef={langDropdownRef}
+            fontSize={fontSize}
+            cycleFontSize={cycleFontSize}
+            FONT_SIZE_LABELS={FONT_SIZE_LABELS}
+          />
+          {/* Fix #7/#8: Show points if signed in, or a Sign In button if not */}
+          {customer ? (
+            <button
+              className="kiosk__points-badge"
+              onClick={() => setShowLoyaltyLogin(true)}
+              title="Your loyalty points"
+            >
+              ⭐ {customer.points.toLocaleString()} pts
+            </button>
+          ) : (
+            <button
+              className="kiosk__signin-btn"
+              onClick={() => setShowLoyaltyLogin(true)}
+              title="Sign in for rewards"
+            >
+              🔑 Sign In
+            </button>
+          )}
           <button
-            className="kiosk__cart-btn"
-            onClick={() => setView('cart')}
+            className="kiosk__casino-btn"
+            onClick={() => setView(view === 'casino' ? 'categories' : 'casino')}
+            title="Boba Casino"
           >
-            <span className="kiosk__cart-icon">🛒</span>
-            {cartCount > 0 && (
-              <span className="kiosk__cart-badge">{cartCount}</span>
-            )}
-            <span className="kiosk__cart-total">
-              ${cartSubtotal.toFixed(2)}
-            </span>
+            🎰
           </button>
-        )}
+          {/* Fix #1: Cart always visible, pulses when it has items */}
+          {view !== 'confirmation' && (
+            <button
+              className={`kiosk__cart-btn ${cartCount > 0 ? 'kiosk__cart-btn--has-items' : ''}`}
+              onClick={() => setView('cart')}
+            >
+              <span className="kiosk__cart-icon">🛒</span>
+              {cartCount > 0 && (
+                <span className="kiosk__cart-badge">{cartCount}</span>
+              )}
+              <span className="kiosk__cart-total">
+                ${cartSubtotal.toFixed(2)}
+              </span>
+            </button>
+          )}
+        </div>
       </header>
+
+      {/* Translating indicator */}
+      {translating && (
+        <div className="kiosk__translating-bar">
+          <div className="kiosk__loading-spinner kiosk__loading-spinner--small" />
+          <span>Translating...</span>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="kiosk__main">
+        {/* ===== CASINO VIEW ===== */}
+        {view === 'casino' && (
+          <BobaCasino customer={customer} setCustomer={setCustomer} />
+        )}
+
         {/* ===== CATEGORIES VIEW ===== */}
         {view === 'categories' && (
           <div className="kiosk__categories fade-in">
-            <h2 className="kiosk__section-title">What are you in the mood for?</h2>
+            <h2 className="kiosk__section-title">{t(UI_STRINGS.moodTitle)}</h2>
             <div className="kiosk__category-grid">
               {categories.map((cat, i) => (
                 <button
@@ -214,7 +559,7 @@ export default function CustomerApp() {
                   }}
                 >
                   <span className="kiosk__category-icon">{getCategoryIcon(cat)}</span>
-                  <span className="kiosk__category-name">{cat}</span>
+                  <span className="kiosk__category-name">{t(cat)}</span>
                 </button>
               ))}
             </div>
@@ -228,12 +573,12 @@ export default function CustomerApp() {
               className="kiosk__back-btn"
               onClick={() => setView('categories')}
             >
-              ← Back to Menu
+              ← {t(UI_STRINGS.backToMenu)}
             </button>
-            <h2 className="kiosk__section-title">{getCategoryIcon(selectedCategory)} {selectedCategory}</h2>
+            <h2 className="kiosk__section-title">{getCategoryIcon(selectedCategory)} {t(selectedCategory)}</h2>
             <div className="kiosk__items-grid">
               {categoryItems.length === 0 ? (
-                <p className="kiosk__empty-msg">No items available in this category yet.</p>
+                <p className="kiosk__empty-msg">{t(UI_STRINGS.noItems)}</p>
               ) : (
                 categoryItems.map((item, i) => (
                   <button
@@ -244,15 +589,28 @@ export default function CustomerApp() {
                       setSelectedItem(item)
                       setSugar('100%')
                       setIce('Regular Ice')
-                      setTopping('None')
+                      setToppings([])
+                      setEditingItemId(null)
                       setView('customize')
                     }}
                   >
-                    <div className="kiosk__item-image-placeholder">
-                      <span>{getCategoryIcon(item.category)}</span>
+                    <div className="kiosk__item-image-wrap">
+                      <img
+                        className="kiosk__item-image"
+                        src={getDrinkImage(item.item_name)}
+                        alt={item.item_name}
+                        onError={e => {
+                          // If image file doesn't exist, swap to emoji fallback
+                          e.currentTarget.style.display = 'none'
+                          e.currentTarget.nextSibling.style.display = 'flex'
+                        }}
+                      />
+                      <div className="kiosk__item-image-fallback">
+                        <span>{getCategoryIcon(item.category)}</span>
+                      </div>
                     </div>
                     <div className="kiosk__item-info">
-                      <span className="kiosk__item-name">{item.item_name}</span>
+                      <span className="kiosk__item-name">{t(item.item_name)}</span>
                       <span className="kiosk__item-price">${item.price.toFixed(2)}</span>
                     </div>
                   </button>
@@ -269,7 +627,7 @@ export default function CustomerApp() {
               className="kiosk__back-btn"
               onClick={() => setView('items')}
             >
-              ← Back to {selectedCategory}
+              ← {t(UI_STRINGS.backTo)} {t(selectedCategory)}
             </button>
 
             <div className="kiosk__customize-layout">
@@ -278,14 +636,14 @@ export default function CustomerApp() {
                   {getCategoryIcon(selectedItem.category)}
                 </div>
                 <div>
-                  <h2 className="kiosk__customize-title">{selectedItem.item_name}</h2>
-                  <p className="kiosk__customize-base-price">Starting at ${selectedItem.price.toFixed(2)}</p>
+                  <h2 className="kiosk__customize-title">{t(selectedItem.item_name)}</h2>
+                  <p className="kiosk__customize-base-price">{t(UI_STRINGS.startingAt)} ${selectedItem.price.toFixed(2)}</p>
                 </div>
               </div>
 
               {/* Sugar Level */}
               <div className="kiosk__option-group">
-                <h3 className="kiosk__option-label">Sugar Level</h3>
+                <h3 className="kiosk__option-label">{t(UI_STRINGS.sugarLevel)}</h3>
                 <div className="kiosk__option-row">
                   {SUGAR_LEVELS.map(level => (
                     <button
@@ -301,7 +659,7 @@ export default function CustomerApp() {
 
               {/* Ice Level */}
               <div className="kiosk__option-group">
-                <h3 className="kiosk__option-label">Ice Level</h3>
+                <h3 className="kiosk__option-label">{t(UI_STRINGS.iceLevel)}</h3>
                 <div className="kiosk__option-row">
                   {ICE_LEVELS.map(level => (
                     <button
@@ -310,28 +668,39 @@ export default function CustomerApp() {
                       onClick={() => setIce(level)}
                     >
                       <span className="kiosk__option-icon">{ICE_ICONS[level]}</span>
-                      <span>{level}</span>
+                      <span>{t(level)}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Toppings */}
+              {/* Toppings (Multi-Select) */}
               <div className="kiosk__option-group">
-                <h3 className="kiosk__option-label">Add a Topping</h3>
+                <h3 className="kiosk__option-label">{t(UI_STRINGS.addTopping)} (Multiple Allowed)</h3>
                 <div className="kiosk__option-row">
-                  {TOPPINGS.map(top => (
-                    <button
-                      key={top.name}
-                      className={`kiosk__option-btn kiosk__option-btn--topping ${topping === top.name ? 'kiosk__option-btn--active' : ''}`}
-                      onClick={() => setTopping(top.name)}
-                    >
-                      <span>{top.name}</span>
-                      {top.price > 0 && (
-                        <span className="kiosk__option-price">+${top.price.toFixed(2)}</span>
-                      )}
-                    </button>
-                  ))}
+                  {TOPPINGS.filter(top => top.name !== 'None').map(top => {
+                    const isSelected = toppings.includes(top.name)
+                    return (
+                      <button
+                        key={top.name}
+                        className={`kiosk__option-btn kiosk__option-btn--topping ${isSelected ? 'kiosk__option-btn--active' : ''}`}
+                        onClick={() => {
+                          // Fix #2: use snapshot value to avoid stale closure bug
+                          setToppings(prev => {
+                            const already = prev.includes(top.name)
+                            return already
+                              ? prev.filter(x => x !== top.name)
+                              : [...prev, top.name]
+                          })
+                        }}
+                      >
+                        <span>{t(top.name)}</span>
+                        {top.price > 0 && (
+                          <span className="kiosk__option-price">+${top.price.toFixed(2)}</span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -342,7 +711,7 @@ export default function CustomerApp() {
                 ${customizePrice.toFixed(2)}
               </div>
               <button className="kiosk__add-to-cart-btn" onClick={addToCart}>
-                Add to Cart
+                {editingItemId ? 'Update Order' : t(UI_STRINGS.addToCart)}
               </button>
             </div>
           </div>
@@ -355,19 +724,19 @@ export default function CustomerApp() {
               className="kiosk__back-btn"
               onClick={() => setView('categories')}
             >
-              ← Continue Shopping
+              ← {t(UI_STRINGS.continueShopping)}
             </button>
-            <h2 className="kiosk__section-title">Your Order</h2>
+            <h2 className="kiosk__section-title">{t(UI_STRINGS.yourOrder)}</h2>
 
             {cart.length === 0 ? (
               <div className="kiosk__cart-empty">
                 <span className="kiosk__cart-empty-icon">🧋</span>
-                <p>Your cart is empty</p>
+                <p>{t(UI_STRINGS.cartEmpty)}</p>
                 <button
                   className="kiosk__browse-btn"
                   onClick={() => setView('categories')}
                 >
-                  Browse Menu
+                  {t(UI_STRINGS.browseMenu)}
                 </button>
               </div>
             ) : (
@@ -380,27 +749,49 @@ export default function CustomerApp() {
                       style={{ animationDelay: `${i * 0.05}s` }}
                     >
                       <div className="kiosk__cart-item-info">
-                        <h3 className="kiosk__cart-item-name">{item.name}</h3>
+                        <h3 className="kiosk__cart-item-name">{t(item.name)}</h3>
                         <div className="kiosk__cart-item-details">
-                          <span>{item.sugarLevel} Sugar</span>
+                          <span>{item.sugarLevel} {t(UI_STRINGS.sugar)}</span>
                           <span>•</span>
-                          <span>{item.iceLevel}</span>
-                          {item.topping !== 'None' && (
+                          <span>{t(item.iceLevel)}</span>
+                          {item.toppings && item.toppings.length > 0 && (
                             <>
                               <span>•</span>
-                              <span>{item.topping}</span>
+                              <span>{item.toppings.map(t2 => t(t2)).join(', ')}</span>
                             </>
                           )}
                         </div>
                       </div>
                       <div className="kiosk__cart-item-right">
-                        <span className="kiosk__cart-item-price">${item.finalPrice.toFixed(2)}</span>
-                        <button
-                          className="kiosk__cart-remove-btn"
-                          onClick={() => removeFromCart(item.id)}
-                        >
-                          ✕
-                        </button>
+                        <span className="kiosk__cart-item-price">${(item.finalPrice * (item.quantity || 1)).toFixed(2)}</span>
+                        
+                        <div className="kiosk__cart-qty-controls">
+                          <button 
+                            className="kiosk__cart-qty-btn"
+                            onClick={() => updateCartQuantity(item.id, -1)}
+                            disabled={(item.quantity || 1) <= 1}
+                          >−</button>
+                          <span className="kiosk__cart-qty-val">{item.quantity || 1}</span>
+                          <button 
+                            className="kiosk__cart-qty-btn"
+                            onClick={() => updateCartQuantity(item.id, 1)}
+                          >+</button>
+                        </div>
+                        
+                        <div className="kiosk__cart-item-actions">
+                          <button
+                            className="kiosk__cart-edit-btn"
+                            onClick={() => editCartItem(item.id)}
+                          >
+                            ✎ Edit
+                          </button>
+                          <button
+                            className="kiosk__cart-remove-btn"
+                            onClick={() => removeFromCart(item.id)}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -408,22 +799,22 @@ export default function CustomerApp() {
 
                 <div className="kiosk__cart-summary">
                   <div className="kiosk__cart-line">
-                    <span>Subtotal</span>
+                    <span>{t(UI_STRINGS.subtotal)}</span>
                     <span>${cartSubtotal.toFixed(2)}</span>
                   </div>
                   <div className="kiosk__cart-line">
-                    <span>Tax (8.25%)</span>
+                    <span>{t(UI_STRINGS.tax)}</span>
                     <span>${cartTax.toFixed(2)}</span>
                   </div>
                   <div className="kiosk__cart-line kiosk__cart-line--total">
-                    <span>Total</span>
+                    <span>{t(UI_STRINGS.total)}</span>
                     <span>${cartTotal.toFixed(2)}</span>
                   </div>
                   <button
                     className="kiosk__checkout-btn"
                     onClick={() => setView('checkout')}
                   >
-                    Proceed to Checkout
+                    {t(UI_STRINGS.proceedCheckout)}
                   </button>
                 </div>
               </>
@@ -438,18 +829,54 @@ export default function CustomerApp() {
               className="kiosk__back-btn"
               onClick={() => setView('cart')}
             >
-              ← Back to Cart
+              ← {t(UI_STRINGS.backToCart)}
             </button>
-            <h2 className="kiosk__section-title">How would you like to pay?</h2>
+            <h2 className="kiosk__section-title">{t(UI_STRINGS.howToPay)}</h2>
             <p className="kiosk__checkout-total-display">
-              Total: <strong>${cartTotal.toFixed(2)}</strong>
+              {t(UI_STRINGS.total)}: <strong>
+                ${redeemPoints ? (cartTotal - (pointsToRedeem / 10000)).toFixed(2) : cartTotal.toFixed(2)}
+              </strong>
+              {redeemPoints && (
+                <span style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through', marginLeft: '12px', fontWeight: 'normal' }}>
+                  ${cartTotal.toFixed(2)}
+                </span>
+              )}
             </p>
+
+            {/* Fix #6: Clearer points redemption with dollar amount shown upfront */}
+            {customer && customer.points > 0 && (() => {
+              const maxDiscount = Math.min(customer.points, Math.floor(cartTotal * 10000))
+              const dollarSaved = (maxDiscount / 10000).toFixed(2)
+              return (
+                <div className="kiosk__redeem">
+                  <div className="kiosk__redeem-info">
+                    <span className="kiosk__redeem-label">⭐ Loyalty Discount</span>
+                    <span className="kiosk__redeem-balance">
+                      {redeemPoints
+                        ? `Saving $${dollarSaved} — new total: $${(cartTotal - parseFloat(dollarSaved)).toFixed(2)}`
+                        : `You have ${customer.points.toLocaleString()} pts = $${dollarSaved} off`}
+                    </span>
+                  </div>
+                  <button
+                    className={`kiosk__redeem-toggle ${redeemPoints ? 'kiosk__redeem-toggle--on' : 'kiosk__redeem-toggle--off'}`}
+                    onClick={() => {
+                      const newVal = !redeemPoints
+                      setRedeemPoints(newVal)
+                      if (newVal) setPointsToRedeem(maxDiscount)
+                      else setPointsToRedeem(0)
+                    }}
+                  >
+                    {redeemPoints ? '✓ Applied' : 'Apply'}
+                  </button>
+                </div>
+              )
+            })()}
 
             <div className="kiosk__payment-grid">
               {[
-                { method: 'Cash', icon: '💵', desc: 'Pay at counter' },
-                { method: 'Credit', icon: '💳', desc: 'Credit card' },
-                { method: 'Debit', icon: '🏧', desc: 'Debit card' },
+                { method: UI_STRINGS.cash, icon: '💵', desc: UI_STRINGS.payAtCounter },
+                { method: UI_STRINGS.credit, icon: '💳', desc: UI_STRINGS.creditCard },
+                { method: UI_STRINGS.debit, icon: '🏧', desc: UI_STRINGS.debitCard },
               ].map(p => (
                 <button
                   key={p.method}
@@ -458,15 +885,15 @@ export default function CustomerApp() {
                   onClick={() => submitOrder(p.method)}
                 >
                   <span className="kiosk__payment-icon">{p.icon}</span>
-                  <span className="kiosk__payment-method">{p.method}</span>
-                  <span className="kiosk__payment-desc">{p.desc}</span>
+                  <span className="kiosk__payment-method">{t(p.method)}</span>
+                  <span className="kiosk__payment-desc">{t(p.desc)}</span>
                 </button>
               ))}
             </div>
             {submitting && (
               <div className="kiosk__submitting">
                 <div className="kiosk__loading-spinner" />
-                <p>Placing your order...</p>
+                <p>{t(UI_STRINGS.placingOrder)}</p>
               </div>
             )}
           </div>
@@ -477,21 +904,45 @@ export default function CustomerApp() {
           <div className="kiosk__confirmation fade-in">
             <div className="kiosk__confirmation-card">
               <div className="kiosk__confirmation-check">✓</div>
-              <h2 className="kiosk__confirmation-title">Order Placed!</h2>
+              <h2 className="kiosk__confirmation-title">{t(UI_STRINGS.orderPlaced)}</h2>
               <p className="kiosk__confirmation-order-id">
                 Order #{orderResult.orderId}
               </p>
               <p className="kiosk__confirmation-total">
-                Total charged: <strong>${orderResult.total}</strong>
+                {t(UI_STRINGS.totalCharged)} <strong>${orderResult.total}</strong>
               </p>
               <p className="kiosk__confirmation-msg">
-                Thank you for your order! 🐉
+                {t(UI_STRINGS.thankYou)}
               </p>
+
+              {/* Email Notification */}
+              <div className="kiosk__sms-section">
+                {emailSent ? (
+                  <div className="kiosk__sms-success">
+                    <span className="kiosk__sms-success-icon">📱</span>
+                    <p>We'll text you when your order is ready!</p>
+                  </div>
+                ) : (
+                  <>
+                    <SmsNumpadGateway
+                      notifyPhone={notifyPhone}
+                      setNotifyPhone={setNotifyPhone}
+                      notifyCarrier={notifyCarrier}
+                      setNotifyCarrier={setNotifyCarrier}
+                      emailSending={emailSending}
+                      sendEmailNotification={sendEmailNotification}
+                    />
+                  </>
+                )}
+              </div>
+
               <div className="kiosk__confirmation-progress" />
             </div>
           </div>
         )}
       </main>
+
+      <ChatbotWidget />
     </div>
   )
 }

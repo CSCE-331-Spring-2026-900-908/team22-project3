@@ -20,7 +20,7 @@ function getAddonMenuId(toppingName) {
 router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
-    const { items, paymentMethod } = req.body;
+    const { items, paymentMethod, customerPhone, pointsRedeemed } = req.body;
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Cart is empty' });
     }
@@ -28,7 +28,11 @@ router.post('/', async (req, res) => {
     // Calculate totals
     const subtotal = items.reduce((sum, i) => sum + i.finalPrice, 0);
     const tax = subtotal * 0.0825;
-    const total = subtotal + tax;
+    // Apply points redemption discount (100 pts = $0.01, i.e. 10000 pts = $1)
+    const pointsDiscount = pointsRedeemed ? Math.min(pointsRedeemed / 10000, subtotal) : 0;
+    const discountedSubtotal = subtotal - pointsDiscount;
+    const adjustedTax = discountedSubtotal * 0.0825;
+    const total = discountedSubtotal + adjustedTax;
 
     await client.query('BEGIN');
 
@@ -44,9 +48,9 @@ router.post('/', async (req, res) => {
 
     // Insert into Order table
     await client.query(
-      `INSERT INTO "Order" (order_id, created_at, employee_id, status, subtotal, tax, total, payment_method)
-       VALUES ($1, NOW(), $2, 'Completed', $3, $4, $5, $6)`,
-      [orderId, employeeId, subtotal, tax, total, paymentMethod || 'Credit']
+      `INSERT INTO "Order" (order_id, created_at, employee_id, status, subtotal, tax, total, payment_method, customer_phone)
+       VALUES ($1, NOW(), $2, 'Completed', $3, $4, $5, $6, $7)`,
+      [orderId, employeeId, discountedSubtotal, adjustedTax, total, paymentMethod || 'Credit', customerPhone || null]
     );
 
     // Get next order_item_id
@@ -59,10 +63,15 @@ router.post('/', async (req, res) => {
     for (const item of items) {
       const baseDrinkPrice = item.basePrice || item.finalPrice;
 
+      const toppingsList = Array.isArray(item.toppings) 
+        ? item.toppings 
+        : (item.topping && item.topping !== 'None' ? [item.topping] : []);
+      const toppingsString = toppingsList.length > 0 ? toppingsList.join(', ') : 'None';
+
       await client.query(
         `INSERT INTO order_items (order_item_id, order_id, menu_item_id, quantity, unit_price_at_sale, milk_mod, ice_mod, sweetness_mod, line_total)
          VALUES ($1, $2, $3, 1, $4, $5, $6, $7, $8)`,
-        [nextItemId++, orderId, item.menuItemId, baseDrinkPrice, item.topping || 'None', item.iceLevel || 'Regular Ice', item.sugarLevel || '100%', baseDrinkPrice]
+        [nextItemId++, orderId, item.menuItemId, baseDrinkPrice, toppingsString, item.iceLevel || 'Regular Ice', item.sugarLevel || '100%', baseDrinkPrice]
       );
 
       // Deduct inventory for the base drink
@@ -74,29 +83,43 @@ router.post('/', async (req, res) => {
         [item.menuItemId]
       );
 
-      // Handle topping add-on
-      if (item.topping && item.topping !== 'None') {
-        const toppingMenuId = getAddonMenuId(item.topping);
-        if (toppingMenuId > 0) {
-          // Insert addon as separate order item
-          await client.query(
-            `INSERT INTO order_items (order_item_id, order_id, menu_item_id, quantity, unit_price_at_sale, line_total)
-             VALUES ($1, $2, $3, 1, 0.50, 0.50)`,
-            [nextItemId++, orderId, toppingMenuId]
-          );
-          // Deduct inventory for addon
-          await client.query(
-            `UPDATE inventory SET current_quantity = current_quantity - ri.amount_required, last_updated = NOW()
-             FROM recipe r
-             JOIN recipe_ingredient ri ON r.recipe_id = ri.recipe_id
-             WHERE r.menu_item_id = $1 AND inventory.inventory_item_id = ri.inventory_item_id`,
-            [toppingMenuId]
-          );
+      // Handle topping add-ons
+      if (toppingsList.length > 0) {
+        for (const t of toppingsList) {
+          if (t === 'None') continue;
+          const toppingMenuId = getAddonMenuId(t);
+          if (toppingMenuId > 0) {
+            // Insert addon as separate order item
+            await client.query(
+              `INSERT INTO order_items (order_item_id, order_id, menu_item_id, quantity, unit_price_at_sale, line_total)
+               VALUES ($1, $2, $3, 1, 0.50, 0.50)`,
+              [nextItemId++, orderId, toppingMenuId]
+            );
+            // Deduct inventory for addon
+            await client.query(
+              `UPDATE inventory SET current_quantity = current_quantity - ri.amount_required, last_updated = NOW()
+               FROM recipe r
+               JOIN recipe_ingredient ri ON r.recipe_id = ri.recipe_id
+               WHERE r.menu_item_id = $1 AND inventory.inventory_item_id = ri.inventory_item_id`,
+              [toppingMenuId]
+            );
+          }
         }
       }
     }
 
     await client.query('COMMIT');
+
+    // After commit: award loyalty points ($1 total = 100 pts) and deduct redeemed points
+    if (customerPhone) {
+      const pointsEarned = Math.floor(total) * 100;
+      const pointsDelta = pointsEarned - (pointsRedeemed || 0);
+      await pool.query(
+        `UPDATE customers SET points = GREATEST(0, points + $1), updated_at = NOW() WHERE phone_number = $2`,
+        [pointsDelta, customerPhone]
+      );
+    }
+
     res.json({ success: true, orderId, total: total.toFixed(2) });
   } catch (err) {
     await client.query('ROLLBACK');
