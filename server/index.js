@@ -40,6 +40,9 @@ app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/translate', require('./routes/translate'));
+app.use('/api/email', require('./routes/email'));
+app.use('/api/chat', require('./routes/chatbot'));
+app.use('/api/customers', require('./routes/customers'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.listen(PORT, () => console.log(`🐉 Dragon Boba API running on http://localhost:${PORT}`));
