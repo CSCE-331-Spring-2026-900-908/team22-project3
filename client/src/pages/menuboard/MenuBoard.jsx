@@ -13,6 +13,7 @@ const categoryIcons = {
   'Coffee': '☕',
   'Smoothie': '🥤',
   'Creama': '🍦',
+  'Hot Drinks': '🔥',
 }
 
 function getCategoryIcon(category) {

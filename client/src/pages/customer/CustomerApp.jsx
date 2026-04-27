@@ -21,7 +21,12 @@ const categoryIcons = {
   'Coffee': '☕',
   'Smoothie': '🥤',
   'Creama': '🍦',
+  'Hot Drinks': '🔥',
+  'Blended': '🫙',
 }
+
+// Categories that are always cold/blended — no hot option
+const BLENDED_CATEGORIES = ['Slush', 'Blended', 'Smoothie']
 
 function getCategoryIcon(category) {
   return categoryIcons[category] || '🍵'
@@ -39,7 +44,7 @@ function getDrinkImage(itemName) {
 }
 
 // Customization options
-const SUGAR_LEVELS = ['0%', '25%', '50%', '75%', '100%']
+const SUGAR_LEVELS = ['0%', '25%', '50%', '75%', '100%', '125%', '150%']
 const ICE_LEVELS = ['No Ice', 'Less Ice', 'Regular Ice', 'Extra Ice']
 const TOPPINGS = [
   { name: 'None', price: 0 },
@@ -54,6 +59,11 @@ const ICE_ICONS = {
   'Regular Ice': '❄️❄️',
   'Extra Ice': '❄️❄️❄️',
 }
+
+const SIZES = [
+  { name: 'Small', priceAdj: 0, icon: '🥤' },
+  { name: 'Large', priceAdj: 0.75, icon: '🧋' },
+]
 
 const FONT_SIZES = ['normal', 'large', 'xlarge']
 const FONT_SIZE_LABELS = { normal: 'A', large: 'A+', xlarge: 'A++' }
@@ -137,7 +147,9 @@ export default function CustomerApp() {
   // Customization state
   const [sugar, setSugar] = useState('100%')
   const [ice, setIce] = useState('Regular Ice')
+  const [temp, setTemp] = useState('Cold')
   const [toppings, setToppings] = useState([])
+  const [size, setSize] = useState('Small')
 
   // Edit State
   const [editingItemId, setEditingItemId] = useState(null)
@@ -239,6 +251,7 @@ export default function CustomerApp() {
         setMenu(data)
         const cats = [...new Set(data.filter(i => i.category !== 'Add-on').map(i => i.category))]
         if (!cats.includes('Seasonal')) cats.push('Seasonal')
+        if (!cats.includes('Blended')) cats.push('Blended')
         setCategories(cats)
         setLoading(false)
       })
@@ -260,7 +273,9 @@ export default function CustomerApp() {
       const toppingObj = TOPPINGS.find(obj => obj.name === t)
       if (toppingObj) addonsPrice += toppingObj.price
     })
-    const finalPrice = selectedItem.price + addonsPrice
+    const sizeObj = SIZES.find(s => s.name === size)
+    const sizeAdj = sizeObj ? sizeObj.priceAdj : 0
+    const finalPrice = selectedItem.price + addonsPrice + sizeAdj
 
     if (editingItemId) {
       setCart(prev => prev.map(i => i.id === editingItemId ? {
@@ -268,13 +283,16 @@ export default function CustomerApp() {
         finalPrice,
         sugarLevel: sugar,
         iceLevel: ice,
+        tempLevel: temp,
         toppings,
+        size,
       } : i))
       setEditingItemId(null)
-      // Fix #3: return to cart after editing, not categories
       setSugar('100%')
       setIce('Regular Ice')
+      setTemp('Cold')
       setToppings([])
+      setSize('Small')
       setView('cart')
     } else {
       setCart(prev => [...prev, {
@@ -285,15 +303,19 @@ export default function CustomerApp() {
         finalPrice,
         sugarLevel: sugar,
         iceLevel: ice,
+        tempLevel: temp,
         toppings,
+        size,
         quantity: 1,
       }])
       setSugar('100%')
       setIce('Regular Ice')
+      setTemp('Cold')
       setToppings([])
+      setSize('Small')
       setView('categories')
     }
-  }, [selectedItem, sugar, ice, toppings, editingItemId])
+  }, [selectedItem, sugar, ice, toppings, size, editingItemId])
 
   const removeFromCart = useCallback((itemId) => {
     setCart(prev => prev.filter(i => i.id !== itemId))
@@ -316,7 +338,9 @@ export default function CustomerApp() {
     setSelectedItem(fullMenuObj)
     setSugar(itemToEdit.sugarLevel)
     setIce(itemToEdit.iceLevel)
+    setTemp(itemToEdit.tempLevel || 'Cold')
     setToppings(itemToEdit.toppings || [])
+    setSize(itemToEdit.size || 'Small')
     setEditingItemId(itemId)
     setView('customize')
   }, [cart, menu])
@@ -368,6 +392,7 @@ export default function CustomerApp() {
             basePrice: item.basePrice,
             sugarLevel: item.sugarLevel,
             iceLevel: item.iceLevel,
+            tempLevel: item.tempLevel,
             toppings: item.toppings,
           })
         }
@@ -430,7 +455,9 @@ export default function CustomerApp() {
 
   // Calculate live price during customization
   const customizePrice = selectedItem
-    ? selectedItem.price + (toppings.reduce((sum, t) => sum + (TOPPINGS.find(obj => obj.name === t)?.price || 0), 0))
+    ? selectedItem.price
+      + (toppings.reduce((sum, t) => sum + (TOPPINGS.find(obj => obj.name === t)?.price || 0), 0))
+      + (SIZES.find(s => s.name === size)?.priceAdj || 0)
     : 0
 
   // Current language info
@@ -462,7 +489,7 @@ export default function CustomerApp() {
 
       {/* Header */}
       <header className="kiosk__header">
-        {/* Fix #5: Logo click → home */}
+        {}
         <div
           className="kiosk__header-brand kiosk__header-brand--clickable"
           onClick={() => setView('categories')}
@@ -485,7 +512,7 @@ export default function CustomerApp() {
             cycleFontSize={cycleFontSize}
             FONT_SIZE_LABELS={FONT_SIZE_LABELS}
           />
-          {/* Fix #7/#8: Show points if signed in, or a Sign In button if not */}
+          {}
           {customer ? (
             <button
               className="kiosk__points-badge"
@@ -510,7 +537,7 @@ export default function CustomerApp() {
           >
             🎰
           </button>
-          {/* Fix #1: Cart always visible, pulses when it has items */}
+          {}
           {view !== 'confirmation' && (
             <button
               className={`kiosk__cart-btn ${cartCount > 0 ? 'kiosk__cart-btn--has-items' : ''}`}
@@ -588,8 +615,12 @@ export default function CustomerApp() {
                     onClick={() => {
                       setSelectedItem(item)
                       setSugar('100%')
-                      setIce('Regular Ice')
+                      const isHot = item.category === 'Hot Drinks'
+                      const isBlended = BLENDED_CATEGORIES.includes(item.category)
+                      setTemp(isHot ? 'Hot' : 'Cold')
+                      setIce(isHot || isBlended ? 'No Ice' : 'Regular Ice')
                       setToppings([])
+                      setSize('Small')
                       setEditingItemId(null)
                       setView('customize')
                     }}
@@ -641,6 +672,26 @@ export default function CustomerApp() {
                 </div>
               </div>
 
+              {/* Size Selection */}
+              <div className="kiosk__option-group">
+                <h3 className="kiosk__option-label">Size</h3>
+                <div className="kiosk__option-row">
+                  {SIZES.map(s => (
+                    <button
+                      key={s.name}
+                      className={`kiosk__option-btn kiosk__option-btn--size ${size === s.name ? 'kiosk__option-btn--active' : ''}`}
+                      onClick={() => setSize(s.name)}
+                    >
+                      <span className="kiosk__option-icon">{s.icon}</span>
+                      <span>{s.name}</span>
+                      {s.priceAdj > 0 && (
+                        <span className="kiosk__option-price">+${s.priceAdj.toFixed(2)}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Sugar Level */}
               <div className="kiosk__option-group">
                 <h3 className="kiosk__option-label">{t(UI_STRINGS.sugarLevel)}</h3>
@@ -657,7 +708,30 @@ export default function CustomerApp() {
                 </div>
               </div>
 
-              {/* Ice Level */}
+              {/* Temperature — hidden for blended/slushie drinks */}
+              {!BLENDED_CATEGORIES.includes(selectedItem.category) && (
+              <div className="kiosk__option-group">
+                <h3 className="kiosk__option-label">{t('Temperature')}</h3>
+                <div className="kiosk__option-row">
+                  {['Cold', 'Hot'].map(level => (
+                    <button
+                      key={level}
+                      className={`kiosk__option-btn ${temp === level ? 'kiosk__option-btn--active' : ''}`}
+                      onClick={() => {
+                        setTemp(level)
+                        if (level === 'Hot') setIce('No Ice')
+                      }}
+                    >
+                      <span className="kiosk__option-icon">{level === 'Cold' ? '❄️' : '🔥'}</span>
+                      <span>{t(level)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              )}
+
+              {/* Ice Level (hidden when Hot; always shown for blended) */}
+              {(temp !== 'Hot' || BLENDED_CATEGORIES.includes(selectedItem.category)) && (
               <div className="kiosk__option-group">
                 <h3 className="kiosk__option-label">{t(UI_STRINGS.iceLevel)}</h3>
                 <div className="kiosk__option-row">
@@ -673,6 +747,7 @@ export default function CustomerApp() {
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Toppings (Multi-Select) */}
               <div className="kiosk__option-group">
@@ -751,6 +826,18 @@ export default function CustomerApp() {
                       <div className="kiosk__cart-item-info">
                         <h3 className="kiosk__cart-item-name">{t(item.name)}</h3>
                         <div className="kiosk__cart-item-details">
+                          {item.size && (
+                            <>
+                              <span>{item.size === 'Large' ? '🧋' : '🥤'} {item.size}</span>
+                              <span>•</span>
+                            </>
+                          )}
+                          {item.tempLevel === 'Hot' && (
+                            <>
+                              <span>🔥 {t('Hot')}</span>
+                              <span>•</span>
+                            </>
+                          )}
                           <span>{item.sugarLevel} {t(UI_STRINGS.sugar)}</span>
                           <span>•</span>
                           <span>{t(item.iceLevel)}</span>
