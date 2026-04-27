@@ -16,7 +16,7 @@ function getAddonMenuId(toppingName) {
 }
 
 // POST /api/orders — submit a new order
-// Body: { items: [{ menuItemId, finalPrice, sugarLevel, iceLevel, topping }], paymentMethod }
+// Body: { items: [{ menuItemId, finalPrice, sugarLevel, iceLevel, tempLevel, topping }], paymentMethod }
 router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -69,9 +69,9 @@ router.post('/', async (req, res) => {
       const toppingsString = toppingsList.length > 0 ? toppingsList.join(', ') : 'None';
 
       await client.query(
-        `INSERT INTO order_items (order_item_id, order_id, menu_item_id, quantity, unit_price_at_sale, milk_mod, ice_mod, sweetness_mod, line_total)
-         VALUES ($1, $2, $3, 1, $4, $5, $6, $7, $8)`,
-        [nextItemId++, orderId, item.menuItemId, baseDrinkPrice, toppingsString, item.iceLevel || 'Regular Ice', item.sugarLevel || '100%', baseDrinkPrice]
+        `INSERT INTO order_items (order_item_id, order_id, menu_item_id, quantity, unit_price_at_sale, milk_mod, ice_mod, sweetness_mod, temp_mod, line_total)
+         VALUES ($1, $2, $3, 1, $4, $5, $6, $7, $8, $9)`,
+        [nextItemId++, orderId, item.menuItemId, baseDrinkPrice, toppingsString, item.iceLevel || 'Regular Ice', item.sugarLevel || '100%', item.tempLevel || 'Cold', baseDrinkPrice]
       );
 
       // Deduct inventory for the base drink
