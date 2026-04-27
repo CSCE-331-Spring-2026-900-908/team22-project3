@@ -1329,9 +1329,9 @@
   margin: -4px -6px;
   transition: background 0.2s;
 }
-.kiosk__header-brand--clickable:hover {
+/* .kiosk__header-brand--clickable:hover {
   background: rgba(255,255,255,0.08);
-}
+} */
 
 /* Fix #7: Sign In button (shown when not logged in) */
 .kiosk__signin-btn {
