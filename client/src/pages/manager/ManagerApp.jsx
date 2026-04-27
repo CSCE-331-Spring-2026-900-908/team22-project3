@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
 import './Manager.css'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
@@ -32,24 +33,63 @@ function DataTable({ columns, rows, selectedRow, onSelect }) {
 function MenuPanel() {
   const [items, setItems] = useState([])
   const [sel, setSel] = useState(null)
-  const [name, setName] = useState(''), [cat, setCat] = useState(''), [price, setPrice] = useState('')
+  
+  // Update state (only price is updated)
+  const [updatePriceValue, setUpdatePriceValue] = useState('')
 
-  const load = () => fetch(`${API}/menu`).then(r => r.json()).then(data => setItems(data))
+  // Modal / Add New Item state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [name, setName] = useState(''), [cat, setCat] = useState(''), [price, setPrice] = useState('')
+  
+  // Ingredients state
+  const [inventory, setInventory] = useState([])
+  const [ingredients, setIngredients] = useState([])
+  const [ingSelection, setIngSelection] = useState('new')
+  const [ingName, setIngName] = useState('')
+  const [ingAmount, setIngAmount] = useState('')
+  const [ingUnit, setIngUnit] = useState('')
+
+  const load = () => {
+    fetch(`${API}/menu`).then(r => r.json()).then(data => setItems(data))
+    fetch(`${API}/inventory`).then(r => r.json()).then(setInventory)
+  }
   useEffect(() => { load() }, [])
+
+  const handleAddIngredient = () => {
+    if (!ingAmount || !ingUnit) {
+      alert("Amount and Unit are required for the ingredient."); return;
+    }
+    let newIng = {};
+    if (ingSelection === 'new') {
+      if (!ingName) { alert("Ingredient name is required."); return; }
+      newIng = { isNew: true, name: ingName, amount: parseFloat(ingAmount), unit: ingUnit };
+    } else {
+      const invItem = inventory.find(i => i.inventory_item_id === parseInt(ingSelection));
+      if (!invItem) return;
+      newIng = { isNew: false, inventoryId: invItem.inventory_item_id, name: invItem.item_name, amount: parseFloat(ingAmount), unit: ingUnit };
+    }
+    setIngredients([...ingredients, newIng]);
+    setIngName(''); setIngAmount(''); setIngUnit(''); setIngSelection('new');
+  }
+
+  const removeIngredient = (idx) => {
+    setIngredients(ingredients.filter((_, i) => i !== idx));
+  }
 
   const addItem = async () => {
     if (!name || !cat || !price) { alert('Name, Category and Price are required.'); return }
     await fetch(`${API}/menu`, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, category: cat, price: parseFloat(price) }) })
-    setName(''); setCat(''); setPrice(''); setSel(null); load()
+      body: JSON.stringify({ name, category: cat, price: parseFloat(price), ingredients }) })
+    setName(''); setCat(''); setPrice(''); setIngredients([]); setSel(null); setIsModalOpen(false); load();
     alert(`'${name}' added to Menu!`)
   }
   const updatePrice = async () => {
-    if (sel === null) return
+    if (sel === null) { alert("Please select an item to update."); return; }
+    if (!updatePriceValue) { alert("Please enter a new price."); return; }
     const id = items[sel].menu_item_id
     await fetch(`${API}/menu/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ price: parseFloat(price) }) })
-    setPrice(''); load()
+      body: JSON.stringify({ price: parseFloat(updatePriceValue) }) })
+    setUpdatePriceValue(''); load()
   }
   const removeItem = async () => {
     if (sel === null) return
@@ -65,14 +105,93 @@ function MenuPanel() {
         rows={items.map(i => [i.menu_item_id, i.item_name, i.category, `$${parseFloat(i.price).toFixed(2)}`])}
         selectedRow={sel} onSelect={setSel}
       />
-      <div className="mgr-form">
-        <label>Name:</label><input value={name} onChange={e=>setName(e.target.value)} />
-        <label>Category:</label><input value={cat} onChange={e=>setCat(e.target.value)} />
-        <label>Price: $</label><input value={price} onChange={e=>setPrice(e.target.value)} style={{width:70}} />
-        <button onClick={addItem}>Add New Item</button>
-        <button onClick={updatePrice}>Update Selected Price</button>
+      
+      {/* Base UI Bottom Row */}
+      <div className="mgr-form mgr-form-base">
+        <label>Update Price: $</label>
+        <input 
+          type="number" 
+          min="0" 
+          step="0.01" 
+          value={updatePriceValue} 
+          onChange={e=>setUpdatePriceValue(e.target.value)} 
+          style={{width:70}} 
+          placeholder="New $"
+        />
+        <button onClick={updatePrice} className="mgr-btn--alt">Update Selected Price</button>
         <button className="mgr-btn--red" onClick={removeItem}>Remove Selected Item</button>
+        
+        <div style={{ marginLeft: 'auto' }}>
+          <button onClick={() => setIsModalOpen(true)} className="mgr-btn-primary">
+            + Add New Item
+          </button>
+        </div>
       </div>
+
+      {/* Pop-up Modal */}
+      {isModalOpen && (
+        <div className="mgr-modal-overlay">
+          <div className="mgr-modal-content">
+            <button className="mgr-modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
+            
+            <h2 style={{marginTop: 0, marginBottom: '20px'}}>Create New Drink</h2>
+            
+            <div className="mgr-form-section">
+              <h3>Drink Details</h3>
+              <div className="mgr-form-row">
+                <label>Name:</label><input value={name} onChange={e=>setName(e.target.value)} />
+              </div>
+              <div className="mgr-form-row">
+                <label>Category:</label><input value={cat} onChange={e=>setCat(e.target.value)} />
+              </div>
+              <div className="mgr-form-row">
+                <label>Price: $</label><input type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} style={{width:80}} />
+              </div>
+            </div>
+            
+            <div className="mgr-form-section mgr-ingredients-builder" style={{ marginTop: '20px' }}>
+              <h3>Recipe Builder</h3>
+              <div className="mgr-form-row">
+                <select value={ingSelection} onChange={e=>setIngSelection(e.target.value)} style={{ flex: 1 }}>
+                  <option value="new">-- Create New Ingredient --</option>
+                  {inventory.map(i => <option key={i.inventory_item_id} value={i.inventory_item_id}>{i.item_name}</option>)}
+                </select>
+              </div>
+              {ingSelection === 'new' && (
+                <div className="mgr-form-row">
+                  <label>Name:</label><input value={ingName} onChange={e=>setIngName(e.target.value)} placeholder="e.g. Matcha Powder" />
+                </div>
+              )}
+              <div className="mgr-form-row mgr-form-row-compact">
+                <label>Amount:</label><input type="number" min="0" step="0.1" value={ingAmount} onChange={e=>setIngAmount(e.target.value)} style={{width:60}} />
+                <label>Unit:</label><input value={ingUnit} onChange={e=>setIngUnit(e.target.value)} style={{width:60}} placeholder="g" />
+                <button type="button" onClick={handleAddIngredient} className="mgr-btn-small">Add</button>
+              </div>
+              
+              {ingredients.length > 0 && (
+                <div className="mgr-ingredients-list">
+                  <h4>Included Ingredients:</h4>
+                  <ul>
+                    {ingredients.map((ing, idx) => (
+                      <li key={idx}>
+                        <span className="ing-info">{ing.amount} {ing.unit} {ing.name} {ing.isNew && <span className="mgr-badge">NEW</span>}</span>
+                        <button className="mgr-btn-tiny mgr-btn--red" onClick={() => removeIngredient(idx)}>✕</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '30px', textAlign: 'right' }}>
+              <button onClick={addItem} className="mgr-btn-primary" style={{ padding: '10px 20px', fontSize: '1.05rem' }}>
+                Save & Add Drink
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -88,9 +207,23 @@ function InventoryPanel() {
   useEffect(() => { load() }, [])
 
   const addItem = async () => {
+    if (parseFloat(qty) < 0 || parseFloat(min) < 0) {
+      alert("Quantities cannot be negative."); return;
+    }
     await fetch(`${API}/inventory`, { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ name: nameV, qty: parseFloat(qty), min: parseFloat(min), unit, supplierId: parseInt(supId)||null }) })
     setNameV(''); setQty(''); setMin(''); setUnit(''); setSupId(''); load()
+  }
+  const updateQty = async () => {
+    if (sel === null) return
+    if (qty === '' || parseFloat(qty) < 0) {
+      alert("Quantity must be a positive number."); return;
+    }
+    const id = items[sel].inventory_item_id
+    await fetch(`${API}/inventory/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ qty: parseFloat(qty) }) })
+    setQty(''); load()
+    alert("Quantity successfully updated/restocked!")
   }
   const removeItem = async () => {
     if (sel === null) return
@@ -99,8 +232,15 @@ function InventoryPanel() {
     setSel(null); load()
   }
 
+  const lowStockItems = items.filter(i => parseFloat(i.current_quantity) <= parseFloat(i.minimum_amount));
+
   return (
     <div className="mgr-panel">
+      {lowStockItems.length > 0 && (
+        <div style={{ background: '#ffebee', color: '#c62828', padding: '12px', borderRadius: '4px', marginBottom: '16px', borderLeft: '4px solid #c62828' }}>
+          <strong>⚠️ Low Stock Alert:</strong> {lowStockItems.length} item(s) need restocking: {lowStockItems.map(i => i.item_name).join(', ')}
+        </div>
+      )}
       <DataTable
         columns={['ID','Item Name','Quantity','Min Amount','Unit','Last Updated','Supplier ID']}
         rows={items.map(i=>[i.inventory_item_id, i.item_name, i.current_quantity, i.minimum_amount, i.unit,
@@ -109,10 +249,11 @@ function InventoryPanel() {
       />
       <div className="mgr-form">
         <label>Name:</label><input value={nameV} onChange={e=>setNameV(e.target.value)} style={{width:90}} />
-        <label>Qty:</label><input value={qty} onChange={e=>setQty(e.target.value)} style={{width:60}} />
-        <label>Min:</label><input value={min} onChange={e=>setMin(e.target.value)} style={{width:60}} />
+        <label>Qty:</label><input type="number" min="0" value={qty} onChange={e=>setQty(e.target.value)} style={{width:60}} />
+        <label>Min:</label><input type="number" min="0" value={min} onChange={e=>setMin(e.target.value)} style={{width:60}} />
         <label>Unit:</label><input value={unit} onChange={e=>setUnit(e.target.value)} style={{width:60}} />
         <label>Sup ID:</label><input value={supId} onChange={e=>setSupId(e.target.value)} style={{width:50}} />
+        <button onClick={updateQty}>Update Selected Qty</button>
         <button onClick={addItem}>Add New</button>
         <button className="mgr-btn--red" onClick={removeItem}>Remove Selected</button>
       </div>
@@ -385,35 +526,42 @@ export default function ManagerApp() {
   const [loginError, setLoginError] = useState('')
   const [activePanel, setActivePanel] = useState('dashboard')
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
+  const handleGoogleLogin = async (credentialResponse) => {
     setLoginError('')
-    const res = await fetch(`${API}/auth/login`, {
+    const res = await fetch(`${API}/auth/google`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeId: loginId }),
+      body: JSON.stringify({ credential: credentialResponse.credential }),
     })
     const data = await res.json()
-    if (!res.ok) { setLoginError(data.error || 'Login failed'); return }
+    if (!res.ok) { setLoginError(data.error || 'Google Login failed'); return }
     if (data.role.toLowerCase() !== 'manager') {
-      setLoginError('Only managers can access this view.')
+      setLoginError('Unauthorized: Only managers can access this view.')
       return
     }
     setEmployee(data)
   }
 
-  const handleLogout = () => { setEmployee(null); setLoginId(''); setLoginError('') }
+  const handleLogout = () => { setEmployee(null); setLoginError('') }
 
   if (!employee) {
     return (
-      <div className="cashier-login">
-        <h1 className="cashier-login__title">DRAGON BOBA — Manager</h1>
-        <form className="cashier-login__form" onSubmit={handleLogin}>
-          <label>Employee ID:</label>
-          <input type="text" value={loginId} onChange={e=>setLoginId(e.target.value)} autoFocus />
-          {loginError && <p className="cashier-login__error">{loginError}</p>}
-          <button type="submit">Login</button>
-        </form>
-      </div>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        <div className="cashier-login">
+          <h1 className="cashier-login__title">DRAGON BOBA — Manager</h1>
+          <div className="cashier-login__form" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px' }}>
+            <p style={{ color: '#fff', marginBottom: '20px', textAlign: 'center' }}>
+              Please sign in with your authorized Google account.
+            </p>
+            <GoogleLogin
+              onSuccess={handleGoogleLogin}
+              onError={() => setLoginError('Google Login Failed')}
+              theme="filled_blue"
+              size="large"
+            />
+            {loginError && <p className="cashier-login__error" style={{ marginTop: '15px' }}>{loginError}</p>}
+          </div>
+        </div>
+      </GoogleOAuthProvider>
     )
   }
 
