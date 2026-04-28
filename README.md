@@ -39,7 +39,7 @@ A full-stack, browser-based Point of Sale system for Dragon Boba tea shop. Built
 - All UI strings and menu item names are translated on demand and cached per session
 
 ### Boba Casino
-- Mini-games accessible from the kiosk: Blackjack, Dice, and Roulette
+- Mini-games accessible from the kiosk: Blackjack and Dice
 - Integrated with the loyalty points system
 
 ### Weather Widget
