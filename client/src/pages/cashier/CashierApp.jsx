@@ -3,6 +3,24 @@ import './Cashier.css'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
+// Payment method modal
+function PaymentModal({ total, onConfirm, onCancel }) {
+  return (
+    <div className="cashier-modal-overlay">
+      <div className="cashier-modal">
+        <h2 className="cashier-modal__title">Select Payment Method</h2>
+        <p className="cashier-modal__total">Total: <strong>${total.toFixed(2)}</strong></p>
+        <div className="cashier-modal__buttons">
+          <button className="cashier-modal__pay-btn cashier-modal__pay-btn--cash" onClick={() => onConfirm('Cash')}>💵 Cash</button>
+          <button className="cashier-modal__pay-btn cashier-modal__pay-btn--credit" onClick={() => onConfirm('Credit')}>💳 Credit</button>
+          <button className="cashier-modal__pay-btn cashier-modal__pay-btn--debit" onClick={() => onConfirm('Debit')}>🏦 Debit</button>
+        </div>
+        <button className="cashier-modal__cancel" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 
 const SUGAR_LEVELS = ['0%', '25%', '50%', '75%', '100%', '125%', '150%']
 const ICE_LEVELS = ['No Ice', 'Less Ice', 'Regular Ice', 'Extra Ice']
@@ -41,6 +59,7 @@ export default function CashierApp() {
   const [cart, setCart] = useState([])
   const [orderLog, setOrderLog] = useState('')
   const [cartTotal, setCartTotal] = useState(0)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   // fetch menu once logged in
   useEffect(() => {
@@ -131,7 +150,9 @@ export default function CashierApp() {
         menuItemId: selectedItem.menu_item_id,
         name: selectedItem.item_name,
         basePrice: selectedItem.price,
+        unitPrice: finalPrice,
         finalPrice,
+        quantity: 1,
         sugar,
         ice,
         temp,
@@ -147,13 +168,31 @@ export default function CashierApp() {
     setSugar('100%'); setIce('Regular Ice'); setTemp('Cold'); setToppings([]); setSize('Small')
   }
 
-  // Re-build order log string anytime cart changes (vital since we can now edit old items)
+  const updateQuantity = (itemId, delta) => {
+    setCart(prev => {
+      const updated = prev.map(c => {
+        if (c.id !== itemId) return c
+        const newQty = (c.quantity || 1) + delta
+        if (newQty < 1) return null // will be filtered
+        const unitPrice = c.unitPrice || (c.finalPrice / (c.quantity || 1))
+        return { ...c, quantity: newQty, unitPrice, finalPrice: unitPrice * newQty }
+      }).filter(Boolean)
+      return updated
+    })
+  }
+
+  // Re-build order log string and cart total anytime cart changes
   useEffect(() => {
     let newLog = ''
+    let total = 0
     cart.forEach(c => {
-      newLog += `${c.name} - $${c.finalPrice.toFixed(2)}\n  - ${c.size || 'Small'}\n  - ${c.temp === 'Hot' ? '🔥 Hot' : 'Cold'}\n  - ${c.sugar} Sugar\n  - ${c.ice}\n  - ${c.toppings && c.toppings.length > 0 ? c.toppings.join(', ') : 'None'}\n\n`
+      const qty = c.quantity || 1
+      const unitPrice = c.unitPrice || c.finalPrice
+      total += unitPrice * qty
+      newLog += `${qty > 1 ? `${qty}x ` : ''}${c.name} - $${(unitPrice * qty).toFixed(2)}\n  - ${c.size || 'Small'}\n  - ${c.temp === 'Hot' ? '🔥 Hot' : 'Cold'}\n  - ${c.sugar} Sugar\n  - ${c.ice}\n  - ${c.toppings && c.toppings.length > 0 ? c.toppings.join(', ') : 'None'}\n\n`
     })
     setOrderLog(newLog)
+    setCartTotal(total)
   }, [cart])
 
   const clearCart = () => {
@@ -174,20 +213,35 @@ export default function CashierApp() {
     setCenterView('customize')
   }
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (cart.length === 0) { alert('Cart is empty! Add items first.'); return }
-    const method = window.prompt('Payment method:\n1. Cash\n2. Credit\n3. Debit\n\nType Cash, Credit, or Debit:') || 'Cash'
-    const valid = ['Cash', 'Credit', 'Debit']
-    const paymentMethod = valid.find(v => v.toLowerCase() === method.toLowerCase()) || 'Cash'
+    setShowPaymentModal(true)
+  }
+
+  const submitOrder = async (paymentMethod) => {
+    setShowPaymentModal(false)
+    // Expand quantity > 1 items into multiple order_items entries
+    const expandedItems = []
+    cart.forEach(i => {
+      const qty = i.quantity || 1
+      const unitPrice = i.unitPrice || i.finalPrice
+      for (let q = 0; q < qty; q++) {
+        expandedItems.push({
+          menuItemId: i.menuItemId,
+          finalPrice: unitPrice,
+          basePrice: i.basePrice,
+          sugarLevel: i.sugar,
+          iceLevel: i.ice,
+          toppings: i.toppings,
+        })
+      }
+    })
 
     const res = await fetch(`${API}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: cart.map(i => ({
-          menuItemId: i.menuItemId, finalPrice: i.finalPrice, basePrice: i.basePrice,
-          sugarLevel: i.sugar, iceLevel: i.ice, tempLevel: i.temp, toppings: i.toppings,
-        })),
+        items: expandedItems,
         paymentMethod,
         employeeId: employee.employeeId,
       }),
@@ -221,6 +275,7 @@ export default function CashierApp() {
 
   // ========== CASHIER MAIN SCREEN ==========
   return (
+    <>
     <div className="cashier">
       {/* CENTER PANEL */}
       <div className="cashier__center">
@@ -357,18 +412,30 @@ export default function CashierApp() {
       <div className="cashier__sidebar">
         <div className="cashier__sidebar-title">Current Order</div>
         <div className="cashier__cart-items">
-          {cart.map(c => (
-            <div key={c.id} className="cashier__cart-item">
-              <div className="cashier__cart-item-header">
-                <strong>{c.name}</strong> <span>${c.finalPrice.toFixed(2)}</span>
+          {cart.map(c => {
+            const qty = c.quantity || 1
+            const unitPrice = c.unitPrice || c.finalPrice
+            return (
+              <div key={c.id} className="cashier__cart-item">
+                <div className="cashier__cart-item-header">
+                  <strong>{c.name}</strong>
+                  <span>${(unitPrice * qty).toFixed(2)}</span>
+                </div>
+                <div className="cashier__cart-item-details">
+                  {c.size || 'Small'} &bull; {c.temp === 'Hot' ? '🔥 Hot • ' : ''}{c.sugar} Sugar, {c.ice} <br/>
+                  {c.toppings && c.toppings.length > 0 ? c.toppings.join(', ') : 'No Toppings'}
+                </div>
+                <div className="cashier__cart-item-controls">
+                  <div className="cashier__qty-controls">
+                    <button className="cashier__qty-btn" onClick={() => updateQuantity(c.id, -1)}>−</button>
+                    <span className="cashier__qty-value">{qty}</span>
+                    <button className="cashier__qty-btn" onClick={() => updateQuantity(c.id, 1)}>+</button>
+                  </div>
+                  <button className="cashier__cart-edit-btn" onClick={() => editCartItem(c.id)}>✎ Edit</button>
+                </div>
               </div>
-              <div className="cashier__cart-item-details">
-                {c.size || 'Small'} &bull; {c.temp === 'Hot' ? '🔥 Hot, ' : ''}{c.sugar} Sugar, {c.ice} <br/>
-                {c.toppings && c.toppings.length > 0 ? c.toppings.join(', ') : 'No Toppings'}
-              </div>
-              <button className="cashier__cart-edit-btn" onClick={() => editCartItem(c.id)}>✎ Edit</button>
-            </div>
-          ))}
+            )
+          })}
         </div>
         <div className="cashier__sidebar-footer">
           <div className="cashier__total">Total: ${cartTotal.toFixed(2)}</div>
@@ -379,5 +446,15 @@ export default function CashierApp() {
         </div>
       </div>
     </div>
+
+    {/* PAYMENT MODAL */}
+    {showPaymentModal && (
+      <PaymentModal
+        total={cartTotal}
+        onConfirm={submitOrder}
+        onCancel={() => setShowPaymentModal(false)}
+      />
+    )}
+    </>
   )
 }
