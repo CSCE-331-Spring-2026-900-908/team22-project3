@@ -12,6 +12,11 @@ const TOPPINGS = [
   { label: 'Lychee Jelly (+$0.50)', price: 0.50 },
   { label: 'Pudding (+$0.50)', price: 0.50 },
 ]
+const SIZES = [
+  { name: 'Small', priceAdj: 0 },
+  { name: 'Large', priceAdj: 0.75 },
+]
+const BLENDED_CATEGORIES = ['Slush', 'Blended', 'Smoothie']
 
 export default function CashierApp() {
   const [employee, setEmployee] = useState(null)
@@ -29,6 +34,7 @@ export default function CashierApp() {
   const [ice, setIce] = useState('Regular Ice')
   const [temp, setTemp] = useState('Cold')
   const [toppings, setToppings] = useState([])
+  const [size, setSize] = useState('Small')
   const [editingItemId, setEditingItemId] = useState(null)
 
   // cart / order state
@@ -45,6 +51,7 @@ export default function CashierApp() {
         setMenu(data)
         const cats = [...new Set(data.filter(i => i.category !== 'Add-on').map(i => i.category))]
         if (!cats.includes('Seasonal')) cats.push('Seasonal')
+        if (!cats.includes('Blended')) cats.push('Blended')
         setCategories(cats)
       })
   }, [employee])
@@ -87,8 +94,9 @@ export default function CashierApp() {
         if (top) addOnsPrice += top.price
       })
     }
-    return selectedItem.price + addOnsPrice
-  }, [selectedItem, toppings])
+    const sizeAdj = SIZES.find(s => s.name === size)?.priceAdj || 0
+    return selectedItem.price + addOnsPrice + sizeAdj
+  }, [selectedItem, toppings, size])
 
   const addToCart = () => {
     let addOnsPrice = 0
@@ -98,26 +106,24 @@ export default function CashierApp() {
         if (top) addOnsPrice += top.price
       })
     }
-    const finalPrice = selectedItem.price + addOnsPrice
-    
+    const sizeAdj = SIZES.find(s => s.name === size)?.priceAdj || 0
+    const finalPrice = selectedItem.price + addOnsPrice + sizeAdj
+
     if (editingItemId) {
       // Edit mode: replace the old item and adjust totals
       const oldItem = cart.find(i => i.id === editingItemId)
       const diff = finalPrice - oldItem.finalPrice
-      
-      const newLogDiff = `${selectedItem.item_name} - $${finalPrice.toFixed(2)}\n  - ${sugar} Sugar\n  - ${ice}\n  - ${toppings.length > 0 ? toppings.join(', ') : 'None'}\n\n`
-      
+
       setCart(prev => prev.map(i => i.id === editingItemId ? {
         ...i,
         finalPrice,
         sugar,
         ice,
         temp,
-        toppings
+        toppings,
+        size,
       } : i))
       setCartTotal(prev => prev + diff)
-      
-      // We will rebuild the orderLog completely below to ensure it stays accurate
     } else {
       // Add new item
       const newItem = {
@@ -130,6 +136,7 @@ export default function CashierApp() {
         ice,
         temp,
         toppings,
+        size,
       }
       setCart(prev => [...prev, newItem])
       setCartTotal(prev => prev + finalPrice)
@@ -137,20 +144,20 @@ export default function CashierApp() {
 
     setCenterView('categories')
     setEditingItemId(null)
-    setSugar('100%'); setIce('Regular Ice'); setTemp('Cold'); setToppings([])
+    setSugar('100%'); setIce('Regular Ice'); setTemp('Cold'); setToppings([]); setSize('Small')
   }
 
   // Re-build order log string anytime cart changes (vital since we can now edit old items)
   useEffect(() => {
     let newLog = ''
     cart.forEach(c => {
-      newLog += `${c.name} - $${c.finalPrice.toFixed(2)}\n  - ${c.temp === 'Hot' ? '🔥 Hot' : 'Cold'}\n  - ${c.sugar} Sugar\n  - ${c.ice}\n  - ${c.toppings && c.toppings.length > 0 ? c.toppings.join(', ') : 'None'}\n\n`
+      newLog += `${c.name} - $${c.finalPrice.toFixed(2)}\n  - ${c.size || 'Small'}\n  - ${c.temp === 'Hot' ? '🔥 Hot' : 'Cold'}\n  - ${c.sugar} Sugar\n  - ${c.ice}\n  - ${c.toppings && c.toppings.length > 0 ? c.toppings.join(', ') : 'None'}\n\n`
     })
     setOrderLog(newLog)
   }, [cart])
 
   const clearCart = () => {
-    setCart([]); setCartTotal(0); setOrderLog(''); setCenterView('categories'); setEditingItemId(null); setTemp('Cold');
+    setCart([]); setCartTotal(0); setOrderLog(''); setCenterView('categories'); setEditingItemId(null); setTemp('Cold'); setSize('Small');
   }
 
   const editCartItem = (itemId) => {
@@ -162,6 +169,7 @@ export default function CashierApp() {
     setIce(itemToEdit.ice)
     setTemp(itemToEdit.temp || 'Cold')
     setToppings(itemToEdit.toppings || [])
+    setSize(itemToEdit.size || 'Small')
     setEditingItemId(itemId)
     setCenterView('customize')
   }
@@ -249,7 +257,12 @@ export default function CashierApp() {
                   onClick={() => {
                     setSelectedItem(item)
                     const isHot = item.category === 'Hot Drinks'
-                    setSugar('100%'); setIce(isHot ? 'No Ice' : 'Regular Ice'); setTemp(isHot ? 'Hot' : 'Cold'); setToppings([])
+                    const isBlended = BLENDED_CATEGORIES.includes(item.category)
+                    setSugar('100%')
+                    setIce(isHot || isBlended ? 'No Ice' : 'Regular Ice')
+                    setTemp(isHot ? 'Hot' : 'Cold')
+                    setToppings([])
+                    setSize('Small')
                     setCenterView('customize')
                     setEditingItemId(null)
                   }}
@@ -268,12 +281,24 @@ export default function CashierApp() {
             <h2 className="cashier__customize-title">Customize Drink</h2>
 
             <div className="cashier__customize-row">
+              <label>Size:</label>
+              <select value={size} onChange={e => setSize(e.target.value)}>
+                {SIZES.map(s => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}{s.priceAdj > 0 ? ` (+$${s.priceAdj.toFixed(2)})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="cashier__customize-row">
               <label>Sugar Level:</label>
               <select value={sugar} onChange={e => setSugar(e.target.value)}>
                 {SUGAR_LEVELS.map(l => <option key={l}>{l}</option>)}
               </select>
             </div>
 
+            {!BLENDED_CATEGORIES.includes(selectedItem.category) && (
             <div className="cashier__customize-row">
               <label>Temperature:</label>
               <select value={temp} onChange={e => {
@@ -284,8 +309,9 @@ export default function CashierApp() {
                 <option>Hot</option>
               </select>
             </div>
+            )}
 
-            {temp !== 'Hot' && (
+            {(temp !== 'Hot' || BLENDED_CATEGORIES.includes(selectedItem.category)) && (
             <div className="cashier__customize-row">
               <label>Ice Level:</label>
               <select value={ice} onChange={e => setIce(e.target.value)}>
@@ -337,7 +363,7 @@ export default function CashierApp() {
                 <strong>{c.name}</strong> <span>${c.finalPrice.toFixed(2)}</span>
               </div>
               <div className="cashier__cart-item-details">
-                {c.temp === 'Hot' ? '🔥 Hot, ' : ''}{c.sugar} Sugar, {c.ice} <br/>
+                {c.size || 'Small'} &bull; {c.temp === 'Hot' ? '🔥 Hot, ' : ''}{c.sugar} Sugar, {c.ice} <br/>
                 {c.toppings && c.toppings.length > 0 ? c.toppings.join(', ') : 'No Toppings'}
               </div>
               <button className="cashier__cart-edit-btn" onClick={() => editCartItem(c.id)}>✎ Edit</button>
