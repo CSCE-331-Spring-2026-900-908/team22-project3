@@ -512,7 +512,6 @@ function DashboardPanel() {
 // ─── Main Manager App ───
 const NAV_ITEMS = [
   { key: 'menu', label: 'Menu' },
-  { key: 'recent', label: 'Recent Transactions' },
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'employee', label: 'Employee' },
   { key: 'inventory', label: 'Inventory' },
@@ -572,7 +571,6 @@ export default function ManagerApp() {
       case 'employee': return <EmployeePanel />
       case 'reports': return <ReportsPanel />
       case 'analytics': return <AnalyticsPanel />
-      case 'recent': return <AnalyticsPanel initialTab="recent" />
       default: return <DashboardPanel />
     }
   }
