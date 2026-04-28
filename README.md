@@ -16,7 +16,7 @@ A full-stack, browser-based Point of Sale system for Dragon Boba tea shop. Built
 | Customer Kiosk | [/customer](https://team22-project3-dragon-boba-client.onrender.com/customer) | Public |
 | Digital Menu Board | [/menuboard](https://team22-project3-dragon-boba-client.onrender.com/menuboard) | TV Display |
 | Cashier POS | [/cashier](https://team22-project3-dragon-boba-client.onrender.com/cashier) | Employee ID |
-| Manager Panel | [/manager](https://team22-project3-dragon-boba-client.onrender.com/manager) | Manager ID |
+| Manager Panel | [/manager](https://team22-project3-dragon-boba-client.onrender.com/manager) | Google OAuth |
 
 ---
 
