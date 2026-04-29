@@ -51,6 +51,12 @@ const TOPPINGS = [
   { name: 'Boba', price: 0.50 },
   { name: 'Lychee Jelly', price: 0.50 },
   { name: 'Pudding', price: 0.50 },
+  { name: 'Coconut Jelly', price: 0.50 },
+  { name: 'Popping Pearls', price: 0.50 },
+  { name: 'Coffee Jelly', price: 0.50 },
+  { name: 'Taro Boba', price: 0.50 },
+  { name: 'Strawberry Jelly', price: 0.50 },
+  { name: 'Mango Jelly', price: 0.50 },
 ]
 
 const ICE_ICONS = {
@@ -122,6 +128,12 @@ const UI_STRINGS = {
   boba: 'Boba',
   lycheeJelly: 'Lychee Jelly',
   pudding: 'Pudding',
+  coconutJelly: 'Coconut Jelly',
+  poppingPearls: 'Popping Pearls',
+  coffeeJelly: 'Coffee Jelly',
+  taroBoba: 'Taro Boba',
+  strawberryJelly: 'Strawberry Jelly',
+  mangoJelly: 'Mango Jelly',
 }
 
 export default function CustomerApp() {

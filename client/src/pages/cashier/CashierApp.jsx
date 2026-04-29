@@ -29,6 +29,12 @@ const TOPPINGS = [
   { label: 'Boba (+$0.50)', price: 0.50 },
   { label: 'Lychee Jelly (+$0.50)', price: 0.50 },
   { label: 'Pudding (+$0.50)', price: 0.50 },
+  { label: 'Coconut Jelly (+$0.50)', price: 0.50 },
+  { label: 'Popping Pearls (+$0.50)', price: 0.50 },
+  { label: 'Coffee Jelly (+$0.50)', price: 0.50 },
+  { label: 'Taro Boba (+$0.50)', price: 0.50 },
+  { label: 'Strawberry Jelly (+$0.50)', price: 0.50 },
+  { label: 'Mango Jelly (+$0.50)', price: 0.50 },
 ]
 const SIZES = [
   { name: 'Small', priceAdj: 0 },
