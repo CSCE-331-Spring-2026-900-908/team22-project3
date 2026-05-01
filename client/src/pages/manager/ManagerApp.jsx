@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import './Manager.css'
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
@@ -386,6 +389,18 @@ function AnalyticsPanel() {
             <button className="mgr-run-btn" onClick={runXReport}>Run Hourly X-Report</button>
             {xData && <>
               <div className="mgr-subtable-title">Hourly Sales Breakdown</div>
+              <div style={{ width: '100%', height: 300, marginTop: 15, marginBottom: 15 }}>
+                <ResponsiveContainer>
+                  <BarChart data={xData.hourly.map(r => ({ ...r, time: `${r.hr}:00` }))}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis />
+                    <Tooltip formatter={(val) => `$${Number(val).toFixed(2)}`} />
+                    <Legend />
+                    <Bar dataKey="revenue" fill="#8884d8" name="Revenue" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
               <DataTable
                 columns={['Hour','Orders','Items Sold','Subtotal','Tax','Revenue']}
                 rows={(xData.hourly||[]).map(r=>[
@@ -394,6 +409,19 @@ function AnalyticsPanel() {
                 ])}
               />
               <div className="mgr-subtable-title">Payment Method Summary</div>
+              <div style={{ width: '100%', height: 300, marginTop: 15, marginBottom: 15 }}>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={xData.payment} dataKey="total" nameKey="method" cx="50%" cy="50%" outerRadius={100} label={(entry) => `${entry.method} ($${entry.total.toFixed(2)})`}>
+                      {xData.payment.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(val) => `$${Number(val).toFixed(2)}`} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               <DataTable
                 columns={['Payment Method','Orders','Total']}
                 rows={(xData.payment||[]).map(r=>[r.method, r.num_orders, `$${parseFloat(r.total).toFixed(2)}`])}
@@ -440,6 +468,20 @@ function AnalyticsPanel() {
               <label>End Date:</label><input type="date" value={salesEnd} onChange={e=>setSalesEnd(e.target.value)} />
               <button className="mgr-run-btn" onClick={runSales}>Generate Sales Report</button>
             </div>
+            {salesData && salesData.length > 0 && (
+              <div style={{ width: '100%', height: 400, marginTop: 15, marginBottom: 15 }}>
+                <ResponsiveContainer>
+                  <BarChart data={salesData.slice(0, 15)} layout="vertical" margin={{ left: 100, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="item_name" type="category" width={100} />
+                    <Tooltip formatter={(val) => `$${Number(val).toFixed(2)}`} />
+                    <Legend />
+                    <Bar dataKey="revenue" fill="#82ca9d" name="Revenue" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
             {salesData && <DataTable
               columns={['Menu Item','Quantity Sold','Total Revenue']}
               rows={(salesData||[]).map(r=>[r.item_name, r.qty, `$${parseFloat(r.revenue).toFixed(2)}`])}
@@ -455,6 +497,20 @@ function AnalyticsPanel() {
               <label>End Date:</label><input type="date" value={usageEnd} onChange={e=>setUsageEnd(e.target.value)} />
               <button className="mgr-run-btn" onClick={runUsage}>Generate Usage Chart</button>
             </div>
+            {usageData && usageData.length > 0 && (
+              <div style={{ width: '100%', height: 400, marginTop: 15, marginBottom: 15 }}>
+                <ResponsiveContainer>
+                  <BarChart data={usageData.slice(0, 15)} layout="vertical" margin={{ left: 100, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="item_name" type="category" width={100} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="amount_used" fill="#ffc658" name="Amount Used" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
             {usageData && <DataTable
               columns={['Ingredient','Amount Used','Unit']}
               rows={(usageData||[]).map(r=>[r.item_name, r.amount_used.toFixed(2), r.unit])}
